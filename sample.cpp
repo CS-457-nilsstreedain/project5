@@ -183,8 +183,8 @@ int		Xmouse, Ymouse;			// mouse values
 float	Xrot, Yrot;				// rotation angles in degrees
 
 int		SphereList;
-float A = 0.05;
-float P = 0.5;
+float NoiseAmp = 0.3f;
+float NoiseFreq = 1.0f;
 
 // function prototypes:
 
@@ -418,8 +418,10 @@ Display( )
 	Pattern.Use( );
 
 	// set the uniform variables that will change over time:
-    Pattern.SetUniformVariable("uA", A);
-    Pattern.SetUniformVariable("uP", P);
+    Pattern.SetUniformVariable("uA", 0.05f);
+    Pattern.SetUniformVariable("uP", 0.5f);
+    Pattern.SetUniformVariable("uNoiseAmp", NoiseAmp);
+    Pattern.SetUniformVariable("uNoiseFreq", NoiseFreq);
     
     // Set uniform light position values:
     Pattern.SetUniformVariable("uLightX", -20.0f);
@@ -838,16 +840,16 @@ Keyboard( unsigned char c, int x, int y )
 	switch( c )
 	{
         case 'a':
-            A = 0.05;
+            NoiseAmp = 0.3f;
             break;
         case 'A':
-            A = 0.1;
+            NoiseAmp = 0.5f;
             break;
-        case 'p':
-            P = 0.5;
+        case 'f':
+            NoiseFreq = 1.f;
             break;
-        case 'P':
-            P = 1.;
+        case 'F':
+            NoiseFreq = 2.f;
             break;
 
 		case 'q':

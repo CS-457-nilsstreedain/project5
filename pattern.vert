@@ -16,10 +16,13 @@ uniform float uLightZ;
 void
 main( )
 {
-    vST = gl_MultiTexCoord0.st;
     vec4 pos = gl_Vertex;  // original vertex position
     float Y0 = 1.0;        // top of the curtain
     pos.z = uA * (Y0 - pos.y) * sin(2.0 * 3.14159265 * pos.x / uP);
+    
+    vMC = pos.xyz;
+    
+    vST = gl_MultiTexCoord0.st;
     
     float dzdx = uA * (Y0 - gl_Vertex.y) * (2.0 * 3.14159265 / uP) * cos(2.0 * 3.14159265 * gl_Vertex.x / uP);
     float dzdy = - uA * sin(2.0 * 3.14159265 * gl_Vertex.x / uP);
@@ -28,7 +31,8 @@ main( )
     vec3 Ty = vec3(0.0, 1.0, dzdy);    // tangent along y
     vec3 normal = normalize(cross(Tx, Ty));
 
-    vN = normalize(gl_NormalMatrix * normal); // normal vector
+    vN = normal; // normal vector
+    
     vec4 ECposition = gl_ModelViewMatrix * pos;
     vec4 lightPos = gl_ModelViewMatrix * vec4(uLightX, uLightY, uLightZ, 1.0);
     vL = lightPos.xyz - ECposition.xyz;
