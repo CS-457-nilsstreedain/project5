@@ -182,9 +182,21 @@ float	Time;					// used for animation, this has a value between 0. and 1.
 int		Xmouse, Ymouse;			// mouse values
 float	Xrot, Yrot;				// rotation angles in degrees
 
-int		SphereList;
+int		ObjectList;
+
+float Eta = 1.4f;
+float Mix = 0.5f;
 float NoiseAmp = 0.3f;
 float NoiseFreq = 1.0f;
+GLuint CubeName;
+char * FaceFiles[6] = {
+    "nvposx.bmp",
+    "nvnegx.bmp",
+    "nvnegy.bmp",
+    "nvposy.bmp",
+    "nvposz.bmp",
+    "nvnegz.bmp"
+};
 
 // function prototypes:
 
@@ -262,11 +274,11 @@ MulArray3(float factor, float a, float b, float c )
 
 //#include "setmaterial.cpp"
 //#include "setlight.cpp"
-#include "osusphere.cpp"
+//#include "osusphere.cpp"
 //#include "osucone.cpp"
 //#include "osutorus.cpp"
-//#include "bmptotexture.cpp"
-//#include "loadobjfile.cpp"
+#include "bmptotexture.cpp"
+#include "loadobjfile.cpp"
 #include "keytime.cpp"
 #include "glslprogram.cpp"
 
@@ -418,24 +430,22 @@ Display( )
 	Pattern.Use( );
 
 	// set the uniform variables that will change over time:
-    Pattern.SetUniformVariable("uA", 0.05f);
-    Pattern.SetUniformVariable("uP", 0.5f);
+    Pattern.SetUniformVariable("uWhiteMix", 0.2f);
     Pattern.SetUniformVariable("uNoiseAmp", NoiseAmp);
     Pattern.SetUniformVariable("uNoiseFreq", NoiseFreq);
     
-    // Set uniform light position values:
-    Pattern.SetUniformVariable("uLightX", -20.0f);
-    Pattern.SetUniformVariable("uLightY", 10.0f);
-    Pattern.SetUniformVariable("uLightZ", 20.0f);
-    
-    Pattern.SetUniformVariable("uKa", 0.1f);
-    Pattern.SetUniformVariable("uKd", 0.5f);
-    Pattern.SetUniformVariable("uKs", 0.4f);
-    Pattern.SetUniformVariable("uShininess", 12.f);
-
-	glCallList( SphereList );
-
-	Pattern.UnUse( );       // Pattern.Use(0);  also works
+    int ReflectUnit = 5;
+    int RefractUnit = 6;
+    glActiveTexture( GL_TEXTURE0 + ReflectUnit );
+    glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
+    glActiveTexture( GL_TEXTURE0 + RefractUnit );
+    glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
+    Pattern.SetUniformVariable("uReflectUnit", ReflectUnit);
+    Pattern.SetUniformVariable("uRefractUnit", RefractUnit);
+    Pattern.SetUniformVariable("uMix", Mix);
+    Pattern.SetUniformVariable("uEta", Eta);
+	glCallList( ObjectList );
+	Pattern.UnUse( );
 
 
 	// draw some gratuitous text that just rotates on top of the scene:
@@ -775,6 +785,26 @@ InitGraphics( )
 
     // Clean up
     delete [] noiseData;
+    
+    glGenTextures( 1, &CubeName );
+    glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
+    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_REPEAT );
+    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_REPEAT );
+    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_REPEAT );
+    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    for( int file = 0; file < 6; file++ )
+    {
+        int nums, numt;
+        unsigned char * texture2d = BmpToTexture( FaceFiles[file], &nums, &numt );
+        if( texture2d == NULL )
+            fprintf( stderr, "Could not open BMP 2D texture '%s'", FaceFiles[file] );
+        else
+            fprintf( stderr, "BMP 2D texture '%s' read -- nums = %d, numt = %d\n", FaceFiles[file], nums, numt );
+        glTexImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + file, 0, 3, nums, numt, 0,
+            GL_RGB, GL_UNSIGNED_BYTE, texture2d );
+        delete [ ] texture2d;
+    }
 }
 
 
@@ -793,28 +823,29 @@ InitLists( )
 
 	// create the object:
 
-	SphereList = glGenLists( 1 );
-	glNewList( SphereList, GL_COMPILE );
-    float xmin = -1.f;
-    float xmax =  1.f;
-    float ymin = -1.f;
-    float ymax =  1.f;
-    float dx = xmax - xmin;
-    float dy = ymax - ymin;
-    float z = 0.f;
-    int numy = 128;        // set this to what you want it to be
-    int numx = 128;        // set this to what you want it to be
-    for( int iy = 0; iy < numy; iy++ ) {
-            glBegin( GL_QUAD_STRIP );
-            glNormal3f( 0., 0., 1. );
-            for( int ix = 0; ix <= numx; ix++ ) {
-                    glTexCoord2f( (float)ix/(float)numx, (float)(iy+0)/(float)numy );
-                    glVertex3f( xmin + dx*(float)ix/(float)numx, ymin + dy*(float)(iy+0)/(float)numy, z );
-                    glTexCoord2f( (float)ix/(float)numx, (float)(iy+1)/(float)numy );
-                    glVertex3f( xmin + dx*(float)ix/(float)numx, ymin + dy*(float)(iy+1)/(float)numy, z );
-            }
-            glEnd();
-    }
+	ObjectList = glGenLists( 1 );
+	glNewList( ObjectList, GL_COMPILE );
+//    float xmin = -1.f;
+//    float xmax =  1.f;
+//    float ymin = -1.f;
+//    float ymax =  1.f;
+//    float dx = xmax - xmin;
+//    float dy = ymax - ymin;
+//    float z = 0.f;
+//    int numy = 128;        // set this to what you want it to be
+//    int numx = 128;        // set this to what you want it to be
+//    for( int iy = 0; iy < numy; iy++ ) {
+//            glBegin( GL_QUAD_STRIP );
+//            glNormal3f( 0., 0., 1. );
+//            for( int ix = 0; ix <= numx; ix++ ) {
+//                    glTexCoord2f( (float)ix/(float)numx, (float)(iy+0)/(float)numy );
+//                    glVertex3f( xmin + dx*(float)ix/(float)numx, ymin + dy*(float)(iy+0)/(float)numy, z );
+//                    glTexCoord2f( (float)ix/(float)numx, (float)(iy+1)/(float)numy );
+//                    glVertex3f( xmin + dx*(float)ix/(float)numx, ymin + dy*(float)(iy+1)/(float)numy, z );
+//            }
+//            glEnd();
+//    }
+        LoadObjFile("cow.obj");
 	glEndList( );
 
 
@@ -840,16 +871,22 @@ Keyboard( unsigned char c, int x, int y )
 	switch( c )
 	{
         case 'a':
-            NoiseAmp = 0.3f;
+            NoiseAmp = 0.f;
             break;
         case 'A':
             NoiseAmp = 0.5f;
             break;
         case 'f':
-            NoiseFreq = 1.f;
+            NoiseFreq = 1.0f;
             break;
         case 'F':
-            NoiseFreq = 2.f;
+            NoiseFreq = 0.5f;
+            break;
+        case 'm':
+            Mix = 0.0f;
+            break;
+        case 'M':
+            Mix = 1.f;
             break;
 
 		case 'q':
