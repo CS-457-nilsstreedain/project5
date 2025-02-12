@@ -1,4 +1,4 @@
-# project3a
+# project4
 ## Requirements:
 1. The goal of this project is to use cube-mapping to create a reflective and refractive display of a bump-mapped 3D object.
 2. Choose some 3D object for your scene. It can be a built-in glman object or an OBJ file. It must be a full 3D object, not a grid with displacements. (The cube-mapping expects all outward-facing normal vectors.)
