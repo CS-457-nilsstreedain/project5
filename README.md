@@ -1,310 +1,124 @@
-# project4
+# project5
 ## Requirements:
-1. The goal of this project is to use cube-mapping to create a reflective and refractive display of a bump-mapped 3D object.
-2. Choose some 3D object for your scene. It can be a built-in glman object or an OBJ file. It must be a full 3D object, not a grid with displacements. (The cube-mapping expects all outward-facing normal vectors.)
-3. Using a GLIB file (for glman) or using the GLSL API, use the following uniform variables:
+1. In computer graphics (and especially in visualization), there is a technique called a Magic Lens. A Magic Lens is some shape, usually a rectangle or circle, into which a different version of the display is drawn. The Magic Lens can be moved around the scene to show different representations in different regions. Your job is to create a circular Magic Lens for an image display. Inside the Magic Lens, the image needs to be able to be magnified, whirled, and mosaic'ed.
+2.
 Parameter | What It Does | Does it have to be varied?
 -|-|-
-uMix | Blend of reflection and refraction | Yes
-uNoiseAmp | Noise Amplitude | Yes
-uNoiseFreq | Noise Frequency | Yes
-uEta | Index of refraction | No
-uWhiteMix | Mixing of WHITE with the refraction | No
+uSc | s center of the ML | Yes
+uTc | t center of the ML | Yes
+uRad | Radius of the ML | Yes
+uMag | Magnification Factor | Yes
+uWhirl | Whirl coefficient | Yes
+uMosaic | Mosaic'ing coefficient | Yes
 
-4. You need to show the effect of the uMix parameter to blend the reflective and refractive versions of the scene as we did with the cube-mapping example in class.
-5. Create an index of refraction uniform variable, uEta, but it can be hard-coded. A good range for uEta is 1.2 - 2.0
-6. Don't do any lighting. Just use the output from the cube map.
-7. You can use the NVIDIA cube map, the Kelley cube map, or any other cube maps you find.
-
-## A Template Glib File
+3. Draw a quadrilateral that has (s,t) coordinates and map an image to it using a 2D Texture. Use an image of your own choosing -- not one of mine!
+4. If you are using glman, your glib file could look something like this:
 ```
 ##OpenGL GLIB
-Perspective 70
-LookAt 0 0 3  0 0 0  0 1 0
+Ortho -5. 5.   -5. 5.
+LookAt 0 0 2  0 0 0  0 1 0
 
-Vertex texture.vert
-Fragment texture.frag
-Program Texture  TexUnit 6
+Texture2D 5 image.bmp
 
-Texture2D  6  nvposx.bmp
-QuadYZ 5. 5. 10 10
+Vertex   magnifywhirlmosaic.vert
+Fragment magnifywhirlmosaic.frag
+Program  MagnifyWhirlMosaic				\
+	uSc	<0. .5 1.>				\
+	uTc	<0. .5 1.>				\
+	uRad   	<0.01 ?? ??>				\
+	uMag	<.1 ?? ??>				\
+	uWhirl	<-30. 0. 30.>				\
+	uMosaic <0.001 0.001 0.1>			\
+	uImageUnit  5
 
-Texture2D  6  nvnegx.bmp
-QuadYZ -5. 5. 10 10
-
-Texture2D  6  nvposy.bmp
-QuadXZ 5. 5. 10 10
-
-Texture2D  6  nvnegy.bmp
-QuadXZ -5. 5. 10 10
-
-Texture2D  6  nvposz.bmp
-QuadXY 5. 5. 10 10
-
-Texture2D  6  nvnegz.bmp
-QuadXY -5. 5. 10 10
-
-CubeMap 6 nvposx.bmp nvnegx.bmp  nvposy.bmp nvnegy.bmp   nvposz.bmp nvnegz.bmp
-CubeMap 7 nvposx.bmp nvnegx.bmp  nvposy.bmp nvnegy.bmp   nvposz.bmp nvnegz.bmp
-
-Vertex		cube.vert
-Fragment	cube.frag
-Program    	Cube				\
-           	uReflectUnit 6             	\
-           	uRefractUnit 7             	\
-		uMix <0. 0. 1.>			\
-        	uNoiseAmp <0. 0. 5.>		\
-        	uNoiseFreq <0.0 0.1 0.5>	\
-		uWhiteMix 0.2			\
-		uEta 1.4
-
-Scale 0.4
-Obj cow.obj
+QuadXY .1 1.
 ```
 
-## A Template for a C/C++ Program using the API
+## Hints
+- Change the fragment's (s,t) so that it is with respect to the center (uSc,uTc) of the Magic Lens.
 ```
-float Eta;
-float Mix;
-float NoiseAmp;
-float NoiseFreq;
-GLSLProgram Pattern;
-GLuint CubeName;
-char * FaceFiles[6] =
+vec2 st = vST - vec2(???,???);  // make (0,0) the center of the circle
+```
+- Inside the fragment shader, you need to see if the current fragment is inside the Magic Lens circle. If it is not, do a texture lookup as normal.
+```
+if( current fragment is outside uRad )
 {
-	"kec.posx.bmp",
-	"kec.negx.bmp",
-	"kec.posy.bmp",
-	"kec.negy.bmp",
-	"kec.posz.bmp",
-	"kec.negz.bmp"
-};
-
-. . .
-
-void
-InitGraphics( )
+	vec3 rgb = texture( uImageUnit, vST ).rgb;
+	gl_FragColor = vec4( rgb, 1. );
+}
+```
+- Otherwise, do these things:
+```
+else
 {
-	// open the window . . .
-	// setup the callbacks . . .
-	// initialize glew . . .
-	// create and compile the shader . . .
-	// set the uniform variables that don't need to vary . . .
-	glGenTextures( 1, &CubeName );
-	glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
-	glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_REPEAT );
-	glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_REPEAT );
-	glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_REPEAT );
-	glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-	glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-	for( int file = 0; file < 6; file++ )
-	{
-		int nums, numt;
-		unsigned char * texture2d = BmpToTexture( FaceFiles[file], &nums, &numt );
-		if( texture2d == NULL )
-			fprintf( stderr, "Could not open BMP 2D texture '%s'", FaceFiles[file] );
-		else
-			fprintf( stderr, "BMP 2D texture '%s' read -- nums = %d, numt = %d\n", FaceFiles[file], nums, numt );
-		glTexImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + file, 0, 3, nums, numt, 0,
-			GL_RGB, GL_UNSIGNED_BYTE, texture2d );
-		delete [ ] texture2d;
-	}
-
-. . .
-
-void
-Display( )
-{
-	. . .
-	int ReflectUnit = 5;
-	int RefractUnit = 6;
-
-	Pattern.Use( );
-	glActiveTexture( GL_TEXTURE0 + ReflectUnit );
-	glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
-	glActiveTexture( GL_TEXTURE0 + RefractUnit );
-	glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
-	Pattern.SetUniformVariable( "uReflectUnit", ReflectUnit );
-	Pattern.SetUniformVariable( "uRefractUnit", RefractUnit );
-	Pattern.SetUniformVariable( "uMix", Mix );
-	Pattern.SetUniformVariable( "uEta", Eta )
-	glCallList( ObjectList );
-	Pattern.UnUse;
+```
+- Magnifying:
+```
+	float r = the length of st
+	float r' = << if you want to magnify the image by uMag, you do ????? to the length of its (s,t) >>
+```
+- Whirling:
+```
+	float θ  = atan( st.t, st.s );
+	float θ' = θ - uWhirl * r';
+```
+- Restoring (s,t)
+Undo what you did when you changed the fragment's (s,t) to make it with respect to the center (uSc,uTc) of the Magic Lens.
+```
+	st = r' * vec2( cosθ',sinθ' );      // now in the range -1. to +1.
+	st += ?;
+```
+- Mosaic'ing
+```
+	// which block of pixels will this pixel be in?
+	int numins = ???        // same as with the ellipses except use uMosaic instead of uAd and uBd
+	int numint = ???
+	float sc = ???		// center of the block
+	float tc = ???
+	// for this entire block of pixels, we are only going to sample the texture at its center (sc,tc):
+	st.s = sc;
+	st.t = tc;
+```
+- Use st to lookup a color in the image texture. Assign it to gl_FragColor.
+```
+	vec3 rgb = texture( uImageUnit, st ).rgb;
+	gl_FragColor = vec4( rgb, 1. );
 }
 ```
 
-## A Template Vertex Shader File
-```
-#version 330 compatibility
+## The Turn-In Process:
+Use Canvas to turn in your:
+1. Your source files: .cpp, .glib, .vert, .frag, .geom
+2. A short PDF report containing:
+    - Your name
+    - Your email address
+    - Project number and title
+    - A description of what you did to get the display you got
+    - A cool-looking screen shot from your program
+    - The link to the Kaltura video demonstrating that your project does what the requirements ask for. If you can, we'd appreciate it if you'd narrate your video so that you can tell us what it is doing.
+3. To see how to turn these files in to Canvas, go to our Project Notes noteset, and go the the slide labeled How to Turn In a Project on Canvas.
+4. Be sure that your video's permissions are set to unlisted.. The best place to set this is on the OSU Media Server.
+5. A good way to test your video's permissions is to ask a friend to try to open the same video link that you are giving us.
+6. The video doesn't have to be made with Kaltura. Any similar tool will do.
+			
+### Original
+![image](https://github.com/user-attachments/assets/c4ab55ff-256b-48d2-bc57-01a231e9f404)
 
-out vec3	vNormal;
-out vec3	vEyeDir;
-out vec3	vMC;
+### Magnify
+![image](https://github.com/user-attachments/assets/5c75b2cd-cde1-430f-bcde-14c5a75873e2)
 
+### Whirl
+![image](https://github.com/user-attachments/assets/d3d586a7-c55b-4b4c-97b8-840d440ed162)
 
-void
-main( )
-{    
-	vMC = gl_Vertex.xyz;
-	vec3 ECposition = ( gl_ModelViewMatrix * gl_Vertex ).xyz;
-	vEyeDir = ECposition.xyz - vec3( 0., 0., 0. ) ; 
-	       		// vector from the eye position to the point
-	vNormal = normalize( gl_Normal );
-
-	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
-}
-```
-
-## A Template Fragment Shader
-```
-#version 330 compatibility
-
-uniform sampler3D	Noise3;
-uniform float 		uNoiseAmp;
-uniform float 		uNoiseFreq;
-uniform float		uEta;
-uniform float 		uMix;
-uniform float 		uWhiteMix;
-uniform samplerCube uReflectUnit;
-uniform samplerCube uRefractUnit;
-
-in vec3	vNormal;
-in vec3	vEyeDir;
-in vec3	vMC;
-
-const vec3  WHITE = vec3( 1.,1.,1. );
-
-vec3
-PerturbNormal3( float angx, float angy, float angz, vec3 n )
-{
-	float cx = cos( angx );
-	float sx = sin( angx );
-	float cy = cos( angy );
-	float sy = sin( angy );
-	float cz = cos( angz );
-	float sz = sin( angz );
-	
-	// rotate about x:
-	float yp =  n.y*cx - n.z*sx;	// y'
-	n.z      =  n.y*sx + n.z*cx;	// z'
-	n.y      =  yp;
-	// n.x      =  n.x;
-
-	// rotate about y:
-	float xp =  n.x*cy + n.z*sy;	// x'
-	n.z      = -n.x*sy + n.z*cy;	// z'
-	n.x      =  xp;
-	// n.y      =  n.y;
-
-	// rotate about z:
-	      xp =  n.x*cz - n.y*sz;	// x'
-	n.y      =  n.x*sz + n.y*cz;	// y'
-	n.x      = xp;
-	// n.z      =  n.z;
-
-	return normalize( n );
-}
-
-
-void
-main( )
-{
-	vec3 Normal = ?????	// remember to unitize this
-	vec3 Eye =    ?????	// remember to unitize this
-
-	vec4 nvx = texture( Noise3, uNoiseFreq*vMC );
-	vec4 nvy = texture( Noise3, uNoiseFreq*vec3(vMC.xy,vMC.z+0.33) );
-	vec4 nvz = texture( Noise3, uNoiseFreq*vec3(vMC.xy,vMC.z+0.67) );
-
-	float angx = nvx.r + nvx.g + nvx.b + nvx.a;	//  1. -> 3.
-	angx = angx - 2.;				// -1. -> 1.
-	angx *= uNoiseAmp;
-
-	float angy = nvy.r + nvy.g + nvy.b + nvy.a;	//  1. -> 3.
-	angy = angy - 2.;				// -1. -> 1.
-	angy *= uNoiseAmp;
-
-	float angz = nvz.r + nvz.g + nvz.b + nvz.a;	//  1. -> 3.
-	angz = angz - 2.;				// -1. -> 1.
-	angz *= uNoiseAmp;
-
-	Normal = PerturbNormal3( angx, angy, angz, Normal );
-	Normal = normalize( gl_NormalMatrix * Normal );
-
-	vec3 reflectVector = ?????
-	vec3 reflectColor = ?????.rgb
-
-	vec3 refractVector = ?????
-
-	vec3 refractColor;
-	if( all( equal( refractVector, vec3(0.,0.,0.) ) ) )
-	{
-		refractColor = reflectColor;
-	}
-	else
-	{
-		refractColor = texture( uRefractUnit, refractVector ).rgb;
-		refractColor = mix( refractColor, WHITE, uWhiteMix );
-	}
-	gl_FragColor = mix( ?????, ?????, uMix );
-}
-```
-
-## texture.vert and texture.frag
-These are only used for wall decorations. They don't actually participate in the cube mapping, but the cube mapping looks weird without them.
-
-### texture.vert:
-```
-#version 330 compatibility
-
-out vec2	vST;
-
-void
-main( )
-{
-	vST = gl_MultiTexCoord0.st;
-	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
-}
-```
-
-### texture.frag:
-```
-#version 330 compatibility
-
-uniform sampler2D TexUnit;
-
-in vec2		vST;
-
-void main( )
-{
-	vec3 newcolor = texture( TexUnit, vST ).rgb;
-	gl_FragColor = vec4( newcolor, 1. );
-}
-```
-
-## Where to Get Cube Map Images
-Want to use the Nvidia Lobby in a cube map? Here are the files:
-nvposx.bmp
-nvnegx.bmp
-nvposy.bmp
-nvnegy.bmp
-nvposz.bmp
-nvnegz.bmp
-
-Want to use the Kelley Engineering Center Atrium in a cube map? Here are the files:
-kec.posx.bmp
-kec.negx.bmp
-kec.posy.bmp
-kec.negy.bmp
-kec.posz.bmp
-kec.negz.bmp
-
-Here is a good source of other cube maps.
+### Mosaic
+![image](https://github.com/user-attachments/assets/993bbd72-f568-4347-84d1-904ffd4ba249)
 
 ## Grading:
 Feature | Points
 -|-
-Refracts correctly | 30
-Reflects correctly | 30
-Bump-maps correctly | 40
+Something different happens inside the circle | 20
+The circle can be resized and moved | 20
+Magnification works | 20
+Whirling works | 20
+Mosaic'ing works | 20
 Potential Total | 100
