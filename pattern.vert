@@ -1,15 +1,8 @@
-varying vec3    vNormal;
-varying vec3    vEyeDir;
-varying vec3    vMC;
+varying vec2    vST;
 
 void
 main( )
 {
-    vMC = gl_Vertex.xyz;
-    vec3 ECposition = ( gl_ModelViewMatrix * gl_Vertex ).xyz;
-    vEyeDir = -normalize( ECposition );
-                   // vector from the eye position to the point
-    vNormal = normalize( gl_Normal );
-
+    vST = gl_MultiTexCoord0.xy;  // use the built-in texture coordinate
     gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
 }

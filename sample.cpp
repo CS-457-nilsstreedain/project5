@@ -184,10 +184,17 @@ float	Xrot, Yrot;				// rotation angles in degrees
 
 int		ObjectList;
 
-float Eta = 1.4f;
-float Mix = 0.5f;
-float NoiseAmp = 0.3f;
-float NoiseFreq = 1.0f;
+//float Eta = 1.4f;
+//float Mix = 0.5f;
+//float NoiseAmp = 0.3f;
+//float NoiseFreq = 1.0f;
+float Sc = 0.5f;
+float Tc = 0.5f;
+float Rad = 0.3f;
+float Mag = 2.0f;
+float Whirl = 15.0f;
+float Mosaic = 0.01f;
+
 GLuint CubeName;
 char * FaceFiles[6] = {
     "nvposx.bmp",
@@ -428,22 +435,12 @@ Display( )
 	// draw the box object by calling up its display list:
 
 	Pattern.Use( );
-
-	// set the uniform variables that will change over time:
-    Pattern.SetUniformVariable("uWhiteMix", 0.2f);
-    Pattern.SetUniformVariable("uNoiseAmp", NoiseAmp);
-    Pattern.SetUniformVariable("uNoiseFreq", NoiseFreq);
-    
-    int ReflectUnit = 5;
-    int RefractUnit = 6;
-    glActiveTexture( GL_TEXTURE0 + ReflectUnit );
-    glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
-    glActiveTexture( GL_TEXTURE0 + RefractUnit );
-    glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
-    Pattern.SetUniformVariable("uReflectUnit", ReflectUnit);
-    Pattern.SetUniformVariable("uRefractUnit", RefractUnit);
-    Pattern.SetUniformVariable("uMix", Mix);
-    Pattern.SetUniformVariable("uEta", Eta);
+    Pattern.SetUniformVariable("uSc", Sc);
+    Pattern.SetUniformVariable("uTc", Tc);
+    Pattern.SetUniformVariable("uRad", Rad);
+    Pattern.SetUniformVariable("uMag", Mag);
+    Pattern.SetUniformVariable("uWhirl", Whirl);
+    Pattern.SetUniformVariable("uMosaic", Mosaic);
 	glCallList( ObjectList );
 	Pattern.UnUse( );
 
@@ -753,58 +750,30 @@ InitGraphics( )
 	// set the uniform variables that will not change:
 	
 	Pattern.Use( );
-	Pattern.SetUniformVariable( (char *)"uKa", 0.1f );
-	Pattern.SetUniformVariable( (char *)"uKd", 0.5f );
-	Pattern.SetUniformVariable( (char *)"uKs", 0.4f );
-	Pattern.SetUniformVariable( (char *)"uColor", 1.f, 0.5f, 0.f, 1.f );
-	Pattern.SetUniformVariable( (char *)"uSpecularColor", 1.f, 1.f, 1.f, 1.f );
-	Pattern.SetUniformVariable( (char *)"uShininess", 12.f );
+    Pattern.SetUniformVariable("uSc", 0.5f);
+    Pattern.SetUniformVariable("uTc", 0.5f);
+    Pattern.SetUniformVariable("uRad", 0.3f);
+    Pattern.SetUniformVariable("uMag", 2.0f);
+    Pattern.SetUniformVariable("uWhirl", 15.0f);
+    Pattern.SetUniformVariable("uMosaic", 0.01f);
+    Pattern.SetUniformVariable("uImageUnit", 5);
 	Pattern.UnUse( );
 
-    // Allocate random data (16x16x16) or any dimension you like
-    const int NOISE_SIZE = 16;
-    float *noiseData = new float[NOISE_SIZE*NOISE_SIZE*NOISE_SIZE];
-    for (int i = 0; i < NOISE_SIZE*NOISE_SIZE*NOISE_SIZE; i++)
-        noiseData[i] = float(rand()) / float(RAND_MAX);  // [0..1]
-
-    // Upload to OpenGL as a 3D texture
-    glTexImage3D(
-        GL_TEXTURE_3D, 0, GL_RED,
-        NOISE_SIZE, NOISE_SIZE, NOISE_SIZE,
-        0,
-        GL_RED, GL_FLOAT,
-        noiseData
-    );
-
-    // Set parameters
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-
-    // Clean up
-    delete [] noiseData;
-    
-    glGenTextures( 1, &CubeName );
-    glBindTexture( GL_TEXTURE_CUBE_MAP, CubeName );
-    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_REPEAT );
-    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_REPEAT );
-    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_REPEAT );
-    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-    glTexParameterf( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-    for( int file = 0; file < 6; file++ )
-    {
-        int nums, numt;
-        unsigned char * texture2d = BmpToTexture( FaceFiles[file], &nums, &numt );
-        if( texture2d == NULL )
-            fprintf( stderr, "Could not open BMP 2D texture '%s'", FaceFiles[file] );
-        else
-            fprintf( stderr, "BMP 2D texture '%s' read -- nums = %d, numt = %d\n", FaceFiles[file], nums, numt );
-        glTexImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + file, 0, 3, nums, numt, 0,
-            GL_RGB, GL_UNSIGNED_BYTE, texture2d );
-        delete [ ] texture2d;
-    }
+    GLuint imageTexture;
+    int imgWidth, imgHeight;
+    glGenTextures(1, &imageTexture);
+    glActiveTexture(GL_TEXTURE0 + 5);
+    glBindTexture(GL_TEXTURE_2D, imageTexture);
+    unsigned char * imageData = BmpToTexture("image.bmp", &imgWidth, &imgHeight);
+    if(imageData == NULL)
+        fprintf(stderr, "Could not load image.bmp\n");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imgWidth, imgHeight, 0,
+                 GL_RGB, GL_UNSIGNED_BYTE, imageData);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    delete [] imageData;
 }
 
 
@@ -825,27 +794,12 @@ InitLists( )
 
 	ObjectList = glGenLists( 1 );
 	glNewList( ObjectList, GL_COMPILE );
-//    float xmin = -1.f;
-//    float xmax =  1.f;
-//    float ymin = -1.f;
-//    float ymax =  1.f;
-//    float dx = xmax - xmin;
-//    float dy = ymax - ymin;
-//    float z = 0.f;
-//    int numy = 128;        // set this to what you want it to be
-//    int numx = 128;        // set this to what you want it to be
-//    for( int iy = 0; iy < numy; iy++ ) {
-//            glBegin( GL_QUAD_STRIP );
-//            glNormal3f( 0., 0., 1. );
-//            for( int ix = 0; ix <= numx; ix++ ) {
-//                    glTexCoord2f( (float)ix/(float)numx, (float)(iy+0)/(float)numy );
-//                    glVertex3f( xmin + dx*(float)ix/(float)numx, ymin + dy*(float)(iy+0)/(float)numy, z );
-//                    glTexCoord2f( (float)ix/(float)numx, (float)(iy+1)/(float)numy );
-//                    glVertex3f( xmin + dx*(float)ix/(float)numx, ymin + dy*(float)(iy+1)/(float)numy, z );
-//            }
-//            glEnd();
-//    }
-        LoadObjFile("cow.obj");
+        glBegin(GL_QUADS);
+            glTexCoord2f(0.0f, 0.0f); glVertex3f(-1.0f, -1.0f, 0.0f);
+            glTexCoord2f(1.0f, 0.0f); glVertex3f( 1.0f, -1.0f, 0.0f);
+            glTexCoord2f(1.0f, 1.0f); glVertex3f( 1.0f,  1.0f, 0.0f);
+            glTexCoord2f(0.0f, 1.0f); glVertex3f(-1.0f,  1.0f, 0.0f);
+        glEnd();
 	glEndList( );
 
 
@@ -870,23 +824,44 @@ Keyboard( unsigned char c, int x, int y )
 
 	switch( c )
 	{
-        case 'a':
-            NoiseAmp = 0.f;
+        case 's':
+            Sc -= 0.05f;
             break;
-        case 'A':
-            NoiseAmp = 0.5f;
+        case 'S':
+            Sc += 0.05f;
             break;
-        case 'f':
-            NoiseFreq = 1.0f;
+        case 't':
+            Tc -= 0.05f;
             break;
-        case 'F':
-            NoiseFreq = 0.5f;
+        case 'T':
+            Tc += 0.05f;
             break;
-        case 'm':
-            Mix = 0.0f;
+        case 'r':
+            Rad -= 0.05f;
+            if(Rad < 0.01f) Rad = 0.01f;
             break;
-        case 'M':
-            Mix = 1.f;
+        case 'R':
+            Rad += 0.05f;
+            break;
+        case 'v':  // v for zoom out (reduce magnification)
+            Mag -= 0.1f;
+            if(Mag < 0.1f) Mag = 0.1f;
+            break;
+        case 'V':  // V for zoom in (increase magnification)
+            Mag += 0.1f;
+            break;
+        case 'w':
+            Whirl -= 1.0f;
+            break;
+        case 'W':
+            Whirl += 1.0f;
+            break;
+        case 'o':
+            Mosaic -= 0.001f;
+            if(Mosaic < 0.0001f) Mosaic = 0.0001f;
+            break;
+        case 'O':
+            Mosaic += 0.001f;
             break;
 
 		case 'q':
@@ -1008,7 +983,7 @@ void
 Reset( )
 {
 	ActiveButton = 0;
-	AxesOn = 1;
+	AxesOn = 0;
 	DebugOn = 0;
 	Freeze = false;
 	Scale  = 1.0;

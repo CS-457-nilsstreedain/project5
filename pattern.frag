@@ -1,91 +1,38 @@
-uniform sampler3D    Noise3;
-uniform float         uNoiseAmp;
-uniform float         uNoiseFreq;
-uniform float        uEta;
-uniform float         uMix;
-uniform float         uWhiteMix;
-uniform samplerCube uReflectUnit;
-uniform samplerCube uRefractUnit;
+uniform sampler2D uImageUnit;
 
-varying vec3    vNormal;
-varying vec3    vEyeDir;
-varying vec3    vMC;
+uniform float uSc;
+uniform float uTc;
+uniform float uRad;
+uniform float uMag;
+uniform float uWhirl;
+uniform float uMosaic;
 
-const vec3  WHITE = vec3( 1.,1.,1. );
-
-vec3
-PerturbNormal3( float angx, float angy, float angz, vec3 n )
-{
-    float cx = cos( angx );
-    float sx = sin( angx );
-    float cy = cos( angy );
-    float sy = sin( angy );
-    float cz = cos( angz );
-    float sz = sin( angz );
-    
-    // rotate about x:
-    float yp =  n.y*cx - n.z*sx;    // y'
-    n.z      =  n.y*sx + n.z*cx;    // z'
-    n.y      =  yp;
-    // n.x      =  n.x;
-
-    // rotate about y:
-    float xp =  n.x*cy + n.z*sy;    // x'
-    n.z      = -n.x*sy + n.z*cy;    // z'
-    n.x      =  xp;
-    // n.y      =  n.y;
-
-    // rotate about z:
-          xp =  n.x*cz - n.y*sz;    // x'
-    n.y      =  n.x*sz + n.y*cz;    // y'
-    n.x      = xp;
-    // n.z      =  n.z;
-
-    return normalize( n );
-}
-
+varying vec2 vST;
 
 void
 main( )
 {
-    vec3 Normal = normalize( vNormal );
-    vec3 Eye =    normalize( -vEyeDir );
-
-    vec4 nvx = texture3D( Noise3, uNoiseFreq*vMC );
-    vec4 nvy = texture3D( Noise3, uNoiseFreq*vec3(vMC.xy,vMC.z+0.33) );
-    vec4 nvz = texture3D( Noise3, uNoiseFreq*vec3(vMC.xy,vMC.z+0.67) );
-
-    float angx = nvx.r + nvx.g + nvx.b + nvx.a;    //  1. -> 3.
-    angx = angx - 2.;                // -1. -> 1.
-    angx *= uNoiseAmp;
-
-    float angy = nvy.r + nvy.g + nvy.b + nvy.a;    //  1. -> 3.
-    angy = angy - 2.;                // -1. -> 1.
-    angy *= uNoiseAmp;
-
-    float angz = nvz.r + nvz.g + nvz.b + nvz.a;    //  1. -> 3.
-    angz = angz - 2.;                // -1. -> 1.
-    angz *= uNoiseAmp;
-
-    Normal = PerturbNormal3( angx, angy, angz, Normal );
-    Normal = normalize( gl_NormalMatrix * Normal );
-
-    vec3 reflectVector = reflect( Eye, Normal );
-    reflectVector.t = -reflectVector.t;
-    vec3 reflectColor = textureCube( uReflectUnit, reflectVector ).rgb;
-
-    vec3 refractVector = refract( Eye, Normal, uEta );
-    refractVector.t = -refractVector.t;
+    // Change (s,t) so that (0,0) is at the Magic Lens center:
+    vec2 st = vST - vec2(uSc, uTc);
+    float r = length(st);
     
-    vec3 refractColor;
-    if( all( equal( refractVector, vec3(0.,0.,0.) ) ) )
-    {
-        refractColor = reflectColor;
+    // If outside the Magic Lens, sample normally.
+    if (r > uRad) {
+        vec3 rgb = texture2D(uImageUnit, vST).rgb;
+        gl_FragColor = vec4(rgb, 1.0);
     }
-    else
-    {
-        refractColor = textureCube( uRefractUnit, refractVector ).rgb;
-        refractColor = mix( refractColor, WHITE, uWhiteMix );
+    else {
+        float rPrime = r / uMag;
+        float theta = atan(st.t, st.s);
+        float thetaPrime = theta - uWhirl * rPrime;
+        
+        st = rPrime * vec2(cos(thetaPrime), sin(thetaPrime));
+        st += vec2(uSc, uTc);
+        
+        // Mosaic effect: snap stNew to the center of a grid block.
+        st = floor(st / uMosaic) * uMosaic + 0.5 * uMosaic;
+        
+        vec3 rgb = texture2D(uImageUnit, st).rgb;
+        gl_FragColor = vec4(rgb, 1.0);
     }
-    gl_FragColor = vec4( mix( reflectColor, refractColor, uMix ), 1.0 );
 }
